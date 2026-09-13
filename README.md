@@ -1,8 +1,12 @@
-# pa11y snake
-# A plug-and-play setup to run Pa11y and convert the report.json into a digestible markdown, using a python script.
+# a11y-audit-kit
 
-This repository runs automated accessibility checks on your selected pages using [Pa11y CI](https://github.com/pa11y/pa11y-ci).
-Pa11y offers a sitemap.xml crawl, however, this snake process keeps things manual and targetted for efficient testing within internal teams and reporting.
+A plug-and-play setup to run Pa11y and convert the report.json into a digestible
+markdown, using a python script.
+
+This repository runs automated accessibility checks on your selected pages using
+[Pa11y CI](https://github.com/pa11y/pa11y-ci).
+Pa11y offers a sitemap.xml crawl, however, this process keeps things manual and
+targeted for efficient testing within internal teams and reporting.
 
 ## Quick start
 
@@ -12,8 +16,8 @@ drive it.
 ### With a coding agent
 
 ```bash
-git clone https://github.com/marktoadvine/pa11y-snake
-cd pa11y-snake
+git clone https://github.com/marktoadvine/a11y-audit-kit
+cd a11y-audit-kit
 ```
 
 Open your coding agent in that folder and ask, in plain words:
@@ -31,8 +35,8 @@ website's own repository.
 ### By hand
 
 ```bash
-git clone https://github.com/marktoadvine/pa11y-snake
-cd pa11y-snake/configs/desktop
+git clone https://github.com/marktoadvine/a11y-audit-kit
+cd a11y-audit-kit/configs/desktop
 # put your URLs in .pa11yci.json, then:
 npx pa11y-ci@latest
 python3 ../../scripts/pa11y_digest.py reports/pa11y-desktop-results.json ../../reports/audit.md
@@ -214,11 +218,11 @@ folder:
 
 | Want | Do this |
 | --- | --- |
-| It available in every project, no clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `PA11Y_SNAKE_DIR` to a clone of this repository |
+| It available in every project, no clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `A11Y_AUDIT_KIT_DIR` to a clone of this repository |
 | It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md` and `scripts/pa11y_digest.py` into your project, add a pointer to your `AGENTS.md`, and keep `LICENSE` alongside them |
 | A one-off audit, any agent | Paste the contents of `skills/a11y-audit/SKILL.md` into the chat and give it your URLs |
 
-`PA11Y_SNAKE_DIR` is how the skill finds the digest script when the working
+`A11Y_AUDIT_KIT_DIR` is how the skill finds the digest script when the working
 directory is somewhere else. If it is not set, the skill looks in the working
 directory, then alongside itself, then asks.
 

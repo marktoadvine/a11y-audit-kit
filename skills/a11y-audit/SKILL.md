@@ -32,16 +32,16 @@ production site belonging to someone else, or a URL behind a login.
 ### 1. Locate the digest script
 
 The only file this skill needs is `pa11y_digest.py`, a single dependency-free
-Python script from the pa11y-snake repository. Resolve its path first, in this
+Python script from the a11y-audit-kit repository. Resolve its path first, in this
 order, and reuse the result as `$DIGEST` throughout:
 
-1. `$PA11Y_SNAKE_DIR/scripts/pa11y_digest.py`, if that variable is set.
-2. `./scripts/pa11y_digest.py`, if the working directory is the pa11y-snake
+1. `$A11Y_AUDIT_KIT_DIR/scripts/pa11y_digest.py`, if that variable is set.
+2. `./scripts/pa11y_digest.py`, if the working directory is the a11y-audit-kit
    repository.
 3. Relative to this skill file, if you read it from disk. The repository root
    is two levels above `skills/a11y-audit/`.
 4. Otherwise ask the user where the repository is, or offer to clone it:
-   `git clone https://github.com/marktoadvine/pa11y-snake`
+   `git clone https://github.com/marktoadvine/a11y-audit-kit`
 
 Confirm the path exists before running the audit. Finding out after a
 multi-page scan that the results cannot be processed wastes the whole run.

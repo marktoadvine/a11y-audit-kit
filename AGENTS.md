@@ -32,7 +32,7 @@ one digest, then rank the findings into draft tickets.
 
 The skill needs exactly one file from this repository, `scripts/pa11y_digest.py`,
 and writes its own Pa11y configs. If the working directory is not this
-repository, `PA11Y_SNAKE_DIR` points at a clone of it.
+repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
 
 ## Things that will mislead you
 
