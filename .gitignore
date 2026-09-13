@@ -16,3 +16,7 @@ __pycache__/
 # Editor/IDE configuration
 .vscode/
 .idea/
+# Generated audit output (keep the SAMPLE.md placeholders)
+reports/
+configs/*/reports/*
+!configs/*/reports/SAMPLE.md

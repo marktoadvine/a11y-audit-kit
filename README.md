@@ -94,6 +94,58 @@ Important:
 - Add a comma after each URL except the final URL.
 - Save the file before running the audit.
 
+## Make the markdown digest
+
+Pa11y CI writes JSON. The Python script turns it into a markdown digest that
+both a person and a chat agent can read, grouped so that one entry is one unit
+of remediation work rather than one per occurrence.
+
+Run it on a single report:
+
+```bash
+python3 scripts/pa11y_digest.py --out reports/audit.md configs/desktop/reports/pa11y-desktop-results.json
+```
+
+Or merge the desktop and mobile runs into one digest, labelling each run:
+
+```bash
+python3 scripts/pa11y_digest.py \
+  desktop=configs/desktop/reports/pa11y-desktop-results.json \
+  mobile=configs/mobile/reports/pa11y-mobile-results.json \
+  --out reports/audit.md
+```
+
+Each input may be given as `LABEL=PATH`. A bare path takes its label from the
+filename.
+
+The digest contains:
+
+- A summary of pages tested, findings by type, and distinct rules.
+- Any pages that **failed to load**, listed separately. Those pages were never
+  audited, so the headline counts do not cover them.
+- A summary table of one row per rule, with the WCAG conformance level and
+  success criterion parsed out of the rule code so findings can be ranked by
+  severity rather than only by count.
+- Findings by rule, and again by page, with a short stable id per occurrence so
+  a rerun can tell a reopened issue from a new one.
+
+A note on reading the output: the same issue found at both viewports is one
+unit of work, not two. The digest merges those, and the `Runs` column shows
+which viewports each rule appeared in.
+
+## Run it from a chat agent
+
+`.claude/skills/a11y-audit/SKILL.md` packages the whole flow as a skill: hand
+an agent a list of URLs and it writes throwaway configs, runs both viewports,
+builds the digest, then ranks the findings into draft tickets for Jira, Hive or
+similar.
+
+The skill deliberately stops at drafts and does not file anything. Filing is a
+separate step you ask for after reading them.
+
+It needs a shell, Node.js, and network access to the target URLs, so it works
+in agents with a real terminal and not in browser-only chat.
+
 ## Review findings
 
 For each Pa11y CI finding:
@@ -101,14 +153,19 @@ For each Pa11y CI finding:
 1. Open the reported URL in a browser.
 2. Confirm the issue manually.
 3. Identify the affected component or page template.
-4. Fix the issue in your design snd codebase.
+4. Fix the issue in your design and codebase.
 5. After deployment, manually retest and rerun the audit.
 
 ## Notes
 
 - The audit checks only URLs listed in `.pa11yci.json`.
 - It does not crawl the whole website or follow links automatically.
-- Pa11y CI may show a failed status when it finds accessibility issues. Review the reported findings.
+- Pa11y CI exits with a non-zero status when it finds accessibility issues.
+  That is a successful run reporting findings, not a broken run. Review the
+  reported findings.
+- A 404 or login page often returns a simple, accessible error page, which the
+  audit scores as a clean pass. If a page reports no findings when its siblings
+  report many, check that the URL resolved to the page you expected.
 - The audit uses the latest Pa11y CI version, so results may change after future tool updates.
 
 ## Helpful commands
