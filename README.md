@@ -4,6 +4,45 @@
 This repository runs automated accessibility checks on your selected pages using [Pa11y CI](https://github.com/pa11y/pa11y-ci).
 Pa11y offers a sitemap.xml crawl, however, this snake process keeps things manual and targetted for efficient testing within internal teams and reporting.
 
+## Quick start
+
+Two ways to use this, depending on whether you want to drive it or have an agent
+drive it.
+
+### With a coding agent
+
+```bash
+git clone https://github.com/marktoadvine/pa11y-snake
+cd pa11y-snake
+```
+
+Open your coding agent in that folder and ask, in plain words:
+
+> Audit these URLs for accessibility: example.com, example.com/about-us
+
+The agent picks up the skill on its own, runs the audit at both desktop and
+mobile, writes the markdown digest, and hands back findings ranked into draft
+tickets. Nothing to configure.
+
+You are pointing the tool at **live URLs**, so the site being audited has
+nothing to do with the folder you are in. You never need to be inside your
+website's own repository.
+
+### By hand
+
+```bash
+git clone https://github.com/marktoadvine/pa11y-snake
+cd pa11y-snake/configs/desktop
+# put your URLs in .pa11yci.json, then:
+npx pa11y-ci@latest
+python3 ../../scripts/pa11y_digest.py reports/pa11y-desktop-results.json ../../reports/audit.md
+```
+
+The rest of this README covers that route in detail.
+
+You need [Node.js](https://nodejs.org/) either way, and Python 3 for the digest.
+Both are checked below.
+
 ## What does it do?
 
 Pa11y CI checks the URLs listed in `.pa11yci.json` and reports potential accessibility issues.
@@ -162,6 +201,30 @@ The last two are pointers containing no procedure. To use the skill from an
 agent that reads neither, point it at `skills/a11y-audit/SKILL.md` directly, or
 just paste that file in — it is written to be followed by any agent with a
 shell, and assumes nothing about the tool running it.
+
+### Using it away from this folder
+
+The skill generates its own Pa11y configs rather than reading them from
+`configs/`, so the only file it needs from this repository is
+`scripts/pa11y_digest.py` — one Python file with no dependencies beyond a stock
+Python 3.
+
+That makes three more ways to use it, on top of cloning and working inside this
+folder:
+
+| Want | Do this |
+| --- | --- |
+| It available in every project, no clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `PA11Y_SNAKE_DIR` to a clone of this repository |
+| It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md` and `scripts/pa11y_digest.py` into your project, and add a pointer to your `AGENTS.md` |
+| A one-off audit, any agent | Paste the contents of `skills/a11y-audit/SKILL.md` into the chat and give it your URLs |
+
+`PA11Y_SNAKE_DIR` is how the skill finds the digest script when the working
+directory is somewhere else. If it is not set, the skill looks in the working
+directory, then alongside itself, then asks.
+
+Nothing a run produces is written into this repository or your working
+directory. Pa11y's configs and raw JSON go to a temp directory, and only the
+digest is written where you ask for it.
 
 ## Review findings
 

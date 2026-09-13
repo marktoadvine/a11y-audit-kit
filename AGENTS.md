@@ -17,8 +17,8 @@ The audit is deliberately **not** a crawl. It checks only the URLs it is given.
 | --- | --- |
 | `skills/a11y-audit/SKILL.md` | The audit procedure. Canonical copy. |
 | `scripts/pa11y_digest.py` | JSON to markdown digest converter. |
-| `configs/desktop/.pa11yci.json` | Desktop viewport config. A template. |
-| `configs/mobile/.pa11yci.json` | Mobile viewport config. A template. |
+| `configs/desktop/.pa11yci.json` | Desktop viewport config, for manual runs only. |
+| `configs/mobile/.pa11yci.json` | Mobile viewport config, for manual runs only. |
 | `.claude/skills/a11y-audit/` | Pointer to the canonical skill. No procedure. |
 
 ## Running an audit
@@ -27,17 +27,23 @@ Read **`skills/a11y-audit/SKILL.md`** and follow it. It is written for any
 agent with a shell and is the single source of truth for this workflow; this
 file only summarises it.
 
-In short: generate throwaway configs from the templates, run both viewports,
-merge the reports into one digest, then rank the findings into draft tickets.
+In short: generate throwaway configs, run both viewports, merge the reports into
+one digest, then rank the findings into draft tickets.
+
+The skill needs exactly one file from this repository, `scripts/pa11y_digest.py`,
+and writes its own Pa11y configs. If the working directory is not this
+repository, `PA11Y_SNAKE_DIR` points at a clone of it.
 
 ## Things that will mislead you
 
 - **Pa11y CI exits non-zero when it finds accessibility issues.** That is a
   successful run reporting findings, not a failure. Only treat it as an error
   if no JSON report was written or the output shows a launch or config error.
-- **Never write the user's URLs into `configs/`.** Those files are templates.
-  Editing them dirties the repo on every run and destroys the template. Write
-  throwaway configs to a temp directory instead.
+- **Never write the user's URLs into `configs/`.** Those files exist for people
+  running Pa11y by hand. Editing them dirties the repo on every run. Generate
+  configs into a temp directory instead; the skill contains the JSON to write.
+- **The audit targets deployed URLs, not local code.** The working directory has
+  no relationship to the site being audited, and need not be this repository.
 - **Pa11y CI resolves a relative reporter `fileName` against the current
   working directory**, not the config file. Use absolute paths in generated
   configs.

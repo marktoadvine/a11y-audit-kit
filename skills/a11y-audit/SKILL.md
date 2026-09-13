@@ -5,12 +5,15 @@ description: Run a Pa11y accessibility audit over a list of URLs and turn the re
 
 # Accessibility audit
 
-Audit a set of URLs with Pa11y CI, merge the results into one markdown
-digest, then triage the digest into draft tickets.
+Audit a set of URLs with Pa11y CI, merge the results into one markdown digest,
+then triage the digest into draft tickets.
 
 The digest is the human-readable artifact. The triage is the part that needs
 judgment: deciding which findings are one underlying pattern, which are
 template-level rather than page-level, and which are worth a ticket at all.
+
+This skill audits **deployed URLs**, not local code. The working directory does
+not have to be the site being audited, or related to it at all.
 
 ## Before you start
 
@@ -21,52 +24,96 @@ Ask for the URL list if the user has not supplied one. Do not invent URLs and
 do not crawl for more: this tool is deliberately targeted, and auditing pages
 the user did not ask for wastes their review time.
 
-Confirm before auditing anything that is not obviously the user's to test —
-a production site belonging to someone else, or a URL behind a login.
+Confirm before auditing anything that is not obviously the user's to test — a
+production site belonging to someone else, or a URL behind a login.
 
 ## Steps
 
-### 1. Set up a run directory
+### 1. Locate the digest script
 
-Never edit the tracked configs in `configs/`. They are templates. Writing the
-user's URLs into them dirties the repo on every run and loses the template.
-Build a throwaway run directory instead:
+The only file this skill needs is `pa11y_digest.py`, a single dependency-free
+Python script from the pa11y-snake repository. Resolve its path first, in this
+order, and reuse the result as `$DIGEST` throughout:
+
+1. `$PA11Y_SNAKE_DIR/scripts/pa11y_digest.py`, if that variable is set.
+2. `./scripts/pa11y_digest.py`, if the working directory is the pa11y-snake
+   repository.
+3. Relative to this skill file, if you read it from disk. The repository root
+   is two levels above `skills/a11y-audit/`.
+4. Otherwise ask the user where the repository is, or offer to clone it:
+   `git clone https://github.com/marktoadvine/pa11y-snake`
+
+Confirm the path exists before running the audit. Finding out after a
+multi-page scan that the results cannot be processed wastes the whole run.
+
+### 2. Set up a run directory
+
+Everything the audit writes goes in a throwaway directory, so a run never
+touches the working directory or the repository:
 
 ```bash
 RUN_DIR="$(mktemp -d)"
 mkdir -p "$RUN_DIR/reports"
 ```
 
-Pa11y CI resolves a relative reporter `fileName` against the current working
-directory, so use absolute paths in the generated configs and you can run from
-anywhere.
+### 3. Write one config per viewport
 
-### 2. Write one config per viewport
+Write these configs yourself — do not read them from `configs/`, which holds
+the human-facing copies for manual runs and may not be present at all.
 
-Copy `configs/desktop/.pa11yci.json` and `configs/mobile/.pa11yci.json` as the
-starting point, then replace the `urls` array with the user's URLs and point
-the JSON reporter at an absolute path under `$RUN_DIR/reports/`.
+Pa11y CI resolves a relative reporter `fileName` against the **current working
+directory**, not the config file, so use an absolute path.
 
-Run both viewports unless the user asks for one. Mobile finds different
-issues — reflow, touch target spacing, menus that only exist at small widths —
-and the digest merges them, so the second run is cheap.
+```json
+{
+  "defaults": {
+    "timeout": 30000,
+    "wait": 2000,
+    "viewport": { "width": 1440, "height": 800 },
+    "reporters": [
+      "cli",
+      ["json", { "fileName": "$RUN_DIR/reports/pa11y-desktop-results.json" }]
+    ]
+  },
+  "urls": [
+    "https://example.com/",
+    "https://example.com/about-us/"
+  ]
+}
+```
 
-Keep the `defaults` block from the template. The viewport values and the
-2 second `wait` matter; the wait is what lets client-rendered pages settle
-before the scan, and dropping it produces false "missing content" findings.
+Write that to `$RUN_DIR/.pa11yci-desktop.json` with the user's URLs and the
+real absolute path expanded. For mobile, write the same file to
+`$RUN_DIR/.pa11yci-mobile.json` with the output name changed to
+`pa11y-mobile-results.json` and this viewport:
 
-### 3. Run the audit
+```json
+"viewport": { "width": 390, "height": 812, "isMobile": true, "deviceScaleFactor": 2 }
+```
+
+`deviceScaleFactor` is camelCase. Puppeteer silently ignores unknown viewport
+keys, so a lowercase spelling means the run is at 1x and nothing warns you.
+
+Run both viewports unless the user asks for one. Mobile finds different issues
+— reflow, touch target spacing, menus that only exist at small widths — and the
+digest merges them, so the second run is cheap.
+
+Keep the 2 second `wait`. It is what lets client-rendered pages settle before
+the scan; dropping it produces false "missing content" findings.
+
+### 4. Run the audit
 
 ```bash
-cd "$RUN_DIR" && npx pa11y-ci@latest --config ./.pa11yci-desktop.json
+npx pa11y-ci@latest --config "$RUN_DIR/.pa11yci-desktop.json"
+npx pa11y-ci@latest --config "$RUN_DIR/.pa11yci-mobile.json"
 ```
 
 **Pa11y CI exits non-zero when it finds accessibility issues.** That is a
 successful run reporting findings, not a failure. Only treat it as an error if
 no JSON report was written, or the output shows a launch or config error.
 
-If Chromium fails to launch (common in containers and CI), pass a launch
-config rather than giving up:
+If Chromium fails to launch (common in containers and CI), add a launch config
+to the `defaults` block rather than giving up:
 
 ```json
 "chromeLaunchConfig": {
@@ -74,23 +121,26 @@ config rather than giving up:
 }
 ```
 
-If a sandbox already has a browser installed, add its `executablePath` to the
-same block instead of letting Puppeteer download one.
+If the environment already has a browser installed, add its `executablePath` to
+that same block instead of letting Puppeteer download one.
 
-### 4. Build the digest
+### 5. Build the digest
 
 ```bash
-python3 scripts/pa11y_digest.py \
+python3 "$DIGEST" \
   desktop="$RUN_DIR/reports/pa11y-desktop-results.json" \
   mobile="$RUN_DIR/reports/pa11y-mobile-results.json" \
-  --out reports/a11y-audit-$(date +%F).md
+  --out "a11y-audit-$(date +%F).md"
 ```
 
-The script groups by rule code, parses the WCAG level and success criterion
-out of each code, and merges both viewports. Write the digest somewhere the
-user can keep it and tell them the path.
+The script groups by rule code, parses the WCAG level and success criterion out
+of each code, and merges both viewports.
 
-### 5. Check coverage before reporting
+Write the digest somewhere the user will keep it, not in the temp directory, and
+tell them the path. If the working directory is not somewhere they would want a
+file, ask where to put it.
+
+### 6. Check coverage before reporting
 
 Read the **Pages that failed to load** section first. Those pages were never
 audited, so the headline counts do not cover them. Report them before the
@@ -98,18 +148,18 @@ findings — an audit that silently skipped a third of the site is misleading,
 and "0 findings" on an unreachable page reads like a pass.
 
 Also sanity-check that each URL returned the page you expected. A 404 or a
-login wall often returns a simple, *accessible* error page, which Pa11y
-scores as a clean pass. A page reporting zero findings when its siblings
-report many is the signal to check the URL resolved.
+login wall often returns a simple, *accessible* error page, which Pa11y scores
+as a clean pass. A page reporting zero findings when its siblings report many is
+the signal to check the URL resolved.
 
-### 6. Triage into draft tickets
+### 7. Triage into draft tickets
 
 Work from the **Summary by rule** table. One row is one candidate ticket.
 
 Order by what blocks users, not by count:
 
-- **Errors before warnings before notices.** Notices are advisory and many
-  are not defects.
+- **Errors before warnings before notices.** Notices are advisory and many are
+  not defects.
 - **Level A before AA before AAA** at equal type.
 - A rule hitting many pages is usually a shared template or component. Say so
   in the ticket and name the fix site once, rather than filing per page.
@@ -121,18 +171,18 @@ For each ticket worth opening, draft:
   string.
 - The affected URLs and selectors, from the occurrence list.
 - The WCAG success criterion, so a reviewer can verify the fix.
-- The occurrence fingerprints, so a rerun can tell a reopened issue from a
-  new one.
+- The occurrence fingerprints, so a rerun can tell a reopened issue from a new
+  one.
 
 Collapse a rule that appears at both viewports into one ticket, noting both.
 Split one only where the fix genuinely differs by viewport.
 
-Flag anything automation cannot settle. Pa11y checks what is machine
-checkable; it cannot judge whether alt text is *accurate*, whether a heading
-order is *logical*, or whether a focus order makes sense. Say which findings
-need a human pass rather than implying the list is complete.
+Flag anything automation cannot settle. Pa11y checks what is machine checkable;
+it cannot judge whether alt text is *accurate*, whether a heading order is
+*logical*, or whether a focus order makes sense. Say which findings need a human
+pass rather than implying the list is complete.
 
-### 7. Stop and show the drafts
+### 8. Stop and show the drafts
 
 Present the digest path and the draft tickets. **Do not file them.**
 
