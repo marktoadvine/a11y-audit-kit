@@ -135,16 +135,33 @@ which viewports each rule appeared in.
 
 ## Run it from a chat agent
 
-`.claude/skills/a11y-audit/SKILL.md` packages the whole flow as a skill: hand
-an agent a list of URLs and it writes throwaway configs, runs both viewports,
-builds the digest, then ranks the findings into draft tickets for Jira, Hive or
-similar.
+`skills/a11y-audit/SKILL.md` packages the whole flow: hand an agent a list of
+URLs and it writes throwaway configs, runs both viewports, builds the digest,
+then ranks the findings into draft tickets for Jira, Hive or similar.
 
 The skill deliberately stops at drafts and does not file anything. Filing is a
 separate step you ask for after reading them.
 
 It needs a shell, Node.js, and network access to the target URLs, so it works
 in agents with a real terminal and not in browser-only chat.
+
+### Any agent can use it
+
+The skill is plain markdown in a vendor-neutral directory, so it is not tied to
+one tool. What differs between agents is only how they *find* it, and there is
+no shared convention for that yet, so the repository points each one at the same
+canonical file:
+
+| File | Read by |
+| --- | --- |
+| `skills/a11y-audit/SKILL.md` | The procedure itself. Edit this one. |
+| `AGENTS.md` | Codex, Cursor, Gemini CLI, Jules and others that follow the AGENTS.md convention |
+| `.claude/skills/a11y-audit/SKILL.md` | Claude Code, which auto-discovers skills under `.claude/skills/` |
+
+The last two are pointers containing no procedure. To use the skill from an
+agent that reads neither, point it at `skills/a11y-audit/SKILL.md` directly, or
+just paste that file in — it is written to be followed by any agent with a
+shell, and assumes nothing about the tool running it.
 
 ## Review findings
 
