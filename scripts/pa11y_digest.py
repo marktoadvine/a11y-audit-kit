@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Mark Toadvine, @marktoadvine
 """Convert one or more Pa11y CI JSON reports into a single markdown digest.
 
 The digest groups findings by rule code so that each group maps to one unit of

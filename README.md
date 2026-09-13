@@ -215,7 +215,7 @@ folder:
 | Want | Do this |
 | --- | --- |
 | It available in every project, no clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `PA11Y_SNAKE_DIR` to a clone of this repository |
-| It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md` and `scripts/pa11y_digest.py` into your project, and add a pointer to your `AGENTS.md` |
+| It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md` and `scripts/pa11y_digest.py` into your project, add a pointer to your `AGENTS.md`, and keep `LICENSE` alongside them |
 | A one-off audit, any agent | Paste the contents of `skills/a11y-audit/SKILL.md` into the chat and give it your URLs |
 
 `PA11Y_SNAKE_DIR` is how the skill finds the digest script when the working
@@ -279,3 +279,26 @@ Open a specific file in Terminal editor:
 ```bash
 nano filenamehere.json
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE). Use it, change it, copy it into your own projects,
+commercially or otherwise; just keep the copyright notice with it.
+
+`scripts/pa11y_digest.py` carries an SPDX header so the license travels with it
+when it is vendored on its own.
+
+### Third-party tools
+
+This repository does not bundle Pa11y. `npx pa11y-ci@latest` fetches it at run
+time, and [Pa11y](https://github.com/pa11y/pa11y) and
+[Pa11y CI](https://github.com/pa11y/pa11y-ci) are licensed `LGPL-3.0-only` by
+their own authors.
+
+That license governs Pa11y, not this repository. Nothing here links to or
+includes Pa11y source: the configs are data it reads, and the digest script
+parses the JSON it prints. Running a separately installed program and reading
+its output does not make this a derivative work of it.
+
+Rule codes like `WCAG2AA.Principle1.Guideline1_4.1_4_3.G18.Fail` come from
+HTML_CodeSniffer by way of Pa11y, at run time. None of that text is stored here.
