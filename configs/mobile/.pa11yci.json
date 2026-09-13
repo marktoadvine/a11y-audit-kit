@@ -6,11 +6,11 @@
       "width": 390,
       "height": 812,
       "isMobile": true,
-      "devicescalefactor": 2
+      "deviceScaleFactor": 2
     },
     "reporters": [
       "cli",
-      ["json", { "fileName": "./reports/pa11y-desktop-results.json" }]
+      ["json", { "fileName": "./reports/pa11y-mobile-results.json" }]
     ]
   },
   "urls": [
