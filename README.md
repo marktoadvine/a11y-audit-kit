@@ -1,11 +1,11 @@
 # a11y-audit-kit
 
-A plug-and-play setup to run Pa11y and convert the report.json into a digestible
+A plug-and-play setup for humans or agents to run Pa11y, and convert the report.json into a digestible
 markdown, using a python script.
 
 This repository runs automated accessibility checks on your selected pages using
 [Pa11y CI](https://github.com/pa11y/pa11y-ci).
-Pa11y offers a sitemap.xml crawl, however, this process keeps things manual and
+Pa11y offers a sitemap.xml crawl, but this process keeps things manual and
 targeted for efficient testing within internal teams and reporting.
 
 ## Quick start
@@ -19,6 +19,8 @@ drive it.
 git clone https://github.com/marktoadvine/a11y-audit-kit
 cd a11y-audit-kit
 ```
+
+(You can also open the clone directly in your Claude/Codex/etc desktop app, rather than using CLI).
 
 Open your coding agent in that folder and ask, in plain words:
 
