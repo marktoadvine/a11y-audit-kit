@@ -34,6 +34,26 @@ You are pointing the tool at **live URLs**, so the site being audited has
 nothing to do with the folder you are in. You never need to be inside your
 website's own repository.
 
+### One command
+
+If you would rather run it yourself, `scripts/run_audit.py` does the whole
+flow — both viewports, then the digest — from a list of URLs:
+
+```bash
+git clone https://github.com/marktoadvine/a11y-audit-kit
+cd a11y-audit-kit
+python3 scripts/run_audit.py --check https://example.com/
+python3 scripts/run_audit.py --out audit.md https://example.com/ https://example.com/about-us/
+```
+
+`--check` preflights first: Node, Chromium, proxy settings and whether each URL
+is actually reachable from this machine. It is worth the two seconds, because
+it catches the things that otherwise fail a full run halfway through.
+
+The script resolves Chromium's launch flags, an already-installed browser and
+proxy settings on its own. See [Proxies and TLS
+interception](#proxies-and-tls-interception) if you are behind one.
+
 ### By hand
 
 ```bash
@@ -82,9 +102,14 @@ If you see a version number, you are ready.
 
 2. Open Terminal.
 
-3. Go to the repository folder.
+3. Go to the folder holding the config you want to run, `configs/desktop` or
+   `configs/mobile`.
 
-   Tip: On a MacOS, type `cd ` with a space after it. Drag the repository folder from Finder into Terminal, then press Return.
+   Tip: On a MacOS, type `cd ` with a space after it. Drag that folder from Finder into Terminal, then press Return.
+
+   ```bash
+   cd configs/desktop
+   ```
 
 4. Run:
 
@@ -92,7 +117,16 @@ If you see a version number, you are ready.
    npx pa11y-ci@latest
    ```
 
-Pa11y CI automatically reads `.pa11yci.json` and audits every URL in its `"urls"` list.
+Pa11y CI reads the `.pa11yci.json` in the folder you run it from, and audits
+every URL in that file's `"urls"` list.
+
+> **Run it from the right folder.** Pa11y CI only looks in the current folder,
+> and this repository keeps its configs in `configs/desktop` and
+> `configs/mobile` rather than at the top level. Run it from the repository
+> root and it finds no config, audits nothing, and still prints
+> `✔ 0/0 URLs passed` with a success exit code — a pass that means the opposite
+> of what it looks like. `scripts/run_audit.py` takes URLs as arguments and
+> avoids this entirely.
 
 To stop the audit early, press:
 
@@ -118,7 +152,9 @@ npx pa11y-ci@latest --json > pa11y-results-2026-08-17.json
 
 ## Add or remove URLs
 
-1. Open `.pa11yci.json` in a code editor.
+1. Open the config you are running — `configs/desktop/.pa11yci.json` or
+   `configs/mobile/.pa11yci.json` — in a code editor. They hold separate URL
+   lists, so keep them in step if you run both.
 
 2. Add or remove URLs inside the `"urls"` list.
 
@@ -211,9 +247,10 @@ shell, and assumes nothing about the tool running it.
 ### Using it away from this folder
 
 The skill generates its own Pa11y configs rather than reading them from
-`configs/`, so the only file it needs from this repository is
-`scripts/pa11y_digest.py` — one Python file with no dependencies beyond a stock
-Python 3.
+`configs/`, so the only files it needs from this repository are
+`scripts/run_audit.py` and `scripts/pa11y_digest.py` — two Python files with no
+dependencies beyond a stock Python 3. Keep them together; the runner calls the
+digest script and looks for it beside itself.
 
 That makes three more ways to use it, on top of cloning and working inside this
 folder:
@@ -221,7 +258,7 @@ folder:
 | Want | Do this |
 | --- | --- |
 | It available in every project, no clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `A11Y_AUDIT_KIT_DIR` to a clone of this repository |
-| It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md` and `scripts/pa11y_digest.py` into your project, add a pointer to your `AGENTS.md`, and keep `LICENSE` alongside them |
+| It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md`, `scripts/run_audit.py` and `scripts/pa11y_digest.py` into your project, add a pointer to your `AGENTS.md`, and keep `LICENSE` alongside them |
 | A one-off audit, any agent | Paste the contents of `skills/a11y-audit/SKILL.md` into the chat and give it your URLs |
 
 `A11Y_AUDIT_KIT_DIR` is how the skill finds the digest script when the working
@@ -231,6 +268,53 @@ directory, then alongside itself, then asks.
 Nothing a run produces is written into this repository or your working
 directory. Pa11y's configs and raw JSON go to a temp directory, and only the
 digest is written where you ask for it.
+
+## Proxies and TLS interception
+
+Sandboxed agent environments — Codex, Claude Code on the web, most CI
+containers — send outbound HTTPS through a proxy that re-terminates TLS. Your
+shell tools are usually given that proxy's CA certificate, but Chromium keeps
+its own trust store and does not inherit it. Every page load then fails with:
+
+```text
+Error: net::ERR_CERT_AUTHORITY_INVALID
+```
+
+The digest reports those pages as **failed to load**, not as findings, which is
+correct but easy to misread as a clean site.
+
+Point `run_audit.py` at the proxy's CA and it pins that one key:
+
+```bash
+python3 scripts/run_audit.py --proxy-ca /path/to/proxy-ca.crt --out audit.md https://example.com/
+```
+
+Set `A11Y_PROXY_CA` to make it the default. The certificate is whatever file
+the environment already handed your other tools — check `$SSL_CERT_FILE`,
+`$NODE_EXTRA_CA_CERTS` or `$CURL_CA_BUNDLE`. If one of those points at a file
+holding a single certificate, `run_audit.py` picks it up on its own. A
+multi-certificate bundle is left alone on purpose: pinning every public root
+would weaken certificate checking for every site you visit.
+
+This pins one CA rather than passing `--ignore-certificate-errors`, which turns
+off certificate checking altogether. Prefer the narrow fix.
+
+Two other things that bite in the same environments, both handled by
+`run_audit.py` already:
+
+- Chromium refuses to start as root without `--no-sandbox`.
+- Puppeteer downloads its own Chromium (~150MB) per run unless pointed at an
+  installed one. The script checks `$PUPPETEER_EXECUTABLE_PATH`, `$CHROME_PATH`,
+  `$PLAYWRIGHT_BROWSERS_PATH` and the usual system locations.
+
+If a host is blocked by policy rather than TLS, preflight says so plainly:
+
+```text
+url https://example.com/  unreachable: Tunnel connection failed: 403 Forbidden
+```
+
+That is an egress rule, not a bug in the audit. Run it somewhere with access —
+the [cloud workflow](CLOUD_AUDIT.md) is one option.
 
 ## Review findings
 
