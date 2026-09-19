@@ -65,6 +65,15 @@ CHROME_PATHS = (
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
 )
 
+PUPPETEER_CACHE_PATTERNS = (
+    "chrome-headless-shell/*/chrome-headless-shell-linux64/chrome-headless-shell",
+    "chrome-headless-shell/*/chrome-headless-shell-mac-*/chrome-headless-shell",
+    "chrome-headless-shell/*/chrome-headless-shell-win*/chrome-headless-shell.exe",
+    "chrome/*/chrome-linux64/chrome",
+    "chrome/*/chrome-mac-*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    "chrome/*/chrome-win*/chrome.exe",
+)
+
 PROXY_ENV_VARS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
 
 # Single-certificate files in these variables are treated as a proxy CA.
@@ -127,6 +136,14 @@ def resolve_chrome(explicit=None):
         if candidate.exists():
             return str(candidate), "$PLAYWRIGHT_BROWSERS_PATH"
 
+    cache_dir = Path(
+        os.environ.get("PUPPETEER_CACHE_DIR", Path.home() / ".cache" / "puppeteer")
+    )
+    for pattern in PUPPETEER_CACHE_PATTERNS:
+        matches = sorted(cache_dir.glob(pattern), reverse=True)
+        if matches:
+            return str(matches[0]), "Puppeteer cache"
+
     for path in CHROME_PATHS:
         if Path(path).exists():
             return path, "system"
@@ -135,6 +152,78 @@ def resolve_chrome(explicit=None):
     if found:
         return found, "PATH"
     return None, None
+
+
+def check_chrome_launch(chrome_path, chrome_args=(), timeout=20):
+    """Prove that Chromium can launch inside the current sandbox."""
+    if not chrome_path:
+        return False, "no executable"
+    command = [
+        chrome_path,
+        "--headless",
+        "--disable-gpu",
+        *chrome_args,
+        "--dump-dom",
+        "about:blank",
+    ]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"launch timed out after {timeout}s"
+    except OSError as error:
+        return False, f"launch failed: {error}"
+    if result.returncode == 0:
+        return True, "launch OK"
+    stderr = result.stderr.strip().splitlines()
+    detail = stderr[0] if stderr else f"exit {result.returncode}"
+    for line in stderr:
+        if "socket() failed" in line or "Failed to launch" in line:
+            detail = line.strip()
+            break
+    return False, detail
+
+
+def install_headless_shell():
+    """Install Puppeteer's Chrome Headless Shell and return its path."""
+    cache_dir = Path(
+        os.environ.get("PUPPETEER_CACHE_DIR", Path.home() / ".cache" / "puppeteer")
+    )
+    command = [
+        "npx", "--yes", "@puppeteer/browsers", "install",
+        "chrome-headless-shell@stable", "--path", str(cache_dir),
+    ]
+    log("  chromium                       installing Chrome Headless Shell...")
+    try:
+        subprocess.run(command, check=False, timeout=180)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        log(f"  chromium installer             {error}")
+    chrome, source = resolve_chrome()
+    if chrome and "chrome-headless-shell" in chrome:
+        return chrome, source
+    return None, None
+
+
+def resolve_working_chrome(explicit=None, install=True):
+    """Resolve a browser, verify launch, and fall back to Headless Shell."""
+    chrome, source = resolve_chrome(explicit)
+    launch_args = build_chrome_args()
+    if chrome:
+        launched, detail = check_chrome_launch(chrome, launch_args)
+        if launched:
+            return chrome, source, detail
+        if explicit or "chrome-headless-shell" in chrome:
+            return None, source, detail
+
+    if install:
+        shell, shell_source = install_headless_shell()
+        if shell:
+            launched, detail = check_chrome_launch(shell, launch_args)
+            if launched:
+                return shell, shell_source, detail
+            return None, shell_source, detail
+    return None, source, "no compatible Chromium found"
 
 
 def resolve_proxy(explicit=None):
@@ -277,11 +366,13 @@ def preflight(urls, args):
     if not digest:
         ok = False
 
-    chrome, chrome_source = resolve_chrome(args.chrome)
+    chrome, chrome_source, chrome_detail = resolve_working_chrome(args.chrome)
     facts["chromium"] = (
-        f"{chrome} (from {chrome_source})" if chrome
-        else "not found - Puppeteer will download one on first run"
+        f"{chrome} (from {chrome_source}), {chrome_detail}" if chrome
+        else f"UNUSABLE - {chrome_detail}"
     )
+    if not chrome:
+        ok = False
 
     proxy, proxy_source = resolve_proxy(args.proxy)
     facts["proxy"] = f"{proxy} (from {proxy_source})" if proxy else "none"
@@ -426,7 +517,7 @@ def main():
         return 1
 
     digest_script = resolve_digest_script(args.digest)
-    chrome, _ = resolve_chrome(args.chrome)
+    chrome, _, _ = resolve_working_chrome(args.chrome, install=False)
     proxy, _ = resolve_proxy(args.proxy)
     ca, _ = resolve_proxy_ca(args.proxy_ca)
     spki = spki_hash(ca) if ca else None

@@ -31,7 +31,7 @@ file only summarises it.
 In short:
 
 ```bash
-python3 scripts/run_audit.py --check URL...            # preflight, ~2 seconds
+python3 scripts/run_audit.py --check URL...            # preflight; first run may install Chromium
 python3 scripts/run_audit.py --out audit.md URL...     # both viewports + digest
 ```
 
@@ -71,8 +71,9 @@ directory is not this repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
   your shell tools were given. Pass `--proxy-ca` with the proxy's certificate,
   which pins that one key. Never disable certificate checking to get past it.
 - **Preflight before auditing.** `run_audit.py --check URL...` reports Node,
-  Chromium, the proxy and per-URL reachability in one pass. A blocked host or
-  a missing browser is much cheaper to find there than halfway through a run.
+  launches Chromium, checks the proxy and tests per-URL reachability in one
+  pass. It installs Chrome Headless Shell when the available full Chrome cannot
+  run in the sandbox, so the first check can take longer.
 
 ## Conventions
 

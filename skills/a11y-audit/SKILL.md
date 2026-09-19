@@ -26,8 +26,10 @@ python3 scripts/run_audit.py --out a11y-audit.md https://example.com/ https://ex
 ```
 
 `run_audit.py` writes the throwaway Pa11y configs, runs desktop and mobile,
-builds the digest, and prints a summary. It resolves Chromium, sandbox flags
-and proxy settings itself. Nothing is written anywhere except `--out`.
+builds the digest, and prints a summary. It resolves Chromium, verifies that it
+can actually launch, falls back to Chrome Headless Shell in restricted
+containers, and handles sandbox and proxy settings itself. Nothing is written
+anywhere except `--out` (apart from the normal browser cache on first use).
 
 If `scripts/` is not in the working directory, set `A11Y_AUDIT_KIT_DIR` to a
 clone of the a11y-audit-kit repository, or call the script by its full path.
@@ -55,7 +57,8 @@ reachability, so you should not need a second diagnostic run.
 | --- | --- |
 | `node MISSING` | Install Node.js. Nothing else will work. |
 | `digest script MISSING` | Set `A11Y_AUDIT_KIT_DIR` to a clone of this repository. |
-| `chromium not found` | Fine — Puppeteer downloads one. Slow on first run; install Chromium to avoid it. |
+| `chromium ... installing Chrome Headless Shell` | Fine on first use; the compatible browser is cached for later runs. |
+| `chromium UNUSABLE` | The installed browser and Headless Shell could not launch; use `--chrome PATH` or another runner. |
 | `unreachable: Tunnel connection failed: 403` | An egress policy blocks the host. Report it; do not retry or route around it. |
 | `unreachable` with any other reason | Check the URL, then whether this machine can reach the site at all. |
 

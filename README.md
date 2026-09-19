@@ -46,7 +46,7 @@ python3 scripts/run_audit.py --check https://example.com/
 python3 scripts/run_audit.py --out audit.md https://example.com/ https://example.com/about-us/
 ```
 
-`--check` preflights first: Node, Chromium, proxy settings and whether each URL
+`--check` preflights first: Node, an actual Chromium launch, proxy settings and whether each URL
 is actually reachable from this machine. It is worth the two seconds, because
 it catches the things that otherwise fail a full run halfway through.
 
@@ -299,13 +299,16 @@ would weaken certificate checking for every site you visit.
 This pins one CA rather than passing `--ignore-certificate-errors`, which turns
 off certificate checking altogether. Prefer the narrow fix.
 
-Two other things that bite in the same environments, both handled by
+Three other things that bite in the same environments, all handled by
 `run_audit.py` already:
 
 - Chromium refuses to start as root without `--no-sandbox`.
-- Puppeteer downloads its own Chromium (~150MB) per run unless pointed at an
-  installed one. The script checks `$PUPPETEER_EXECUTABLE_PATH`, `$CHROME_PATH`,
-  `$PLAYWRIGHT_BROWSERS_PATH` and the usual system locations.
+- Full Chrome can be blocked from creating its process-singleton socket even
+  with `--no-sandbox`. The script verifies launch and falls back to Chrome
+  Headless Shell, which is cached after the first install.
+- Puppeteer downloads its own Chromium unless pointed at an installed one. The
+  script checks `$PUPPETEER_EXECUTABLE_PATH`, `$CHROME_PATH`,
+  `$PLAYWRIGHT_BROWSERS_PATH`, the Puppeteer cache and system locations.
 
 If a host is blocked by policy rather than TLS, preflight says so plainly:
 
