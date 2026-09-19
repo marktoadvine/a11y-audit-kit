@@ -136,6 +136,14 @@ jobs:
             "mobile=$RUN_DIR/reports/pa11y-mobile-results.json" \
             --out "$RUN_DIR/reports/a11y-audit.md"
 
+      - name: Publish digest to the run log and summary
+        shell: bash
+        run: |
+          cat "$RUN_DIR/reports/a11y-audit.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "::group::a11y-audit.md"
+          cat "$RUN_DIR/reports/a11y-audit.md"
+          echo "::endgroup::"
+
       - name: Upload audit reports
         uses: actions/upload-artifact@v4
         with:
