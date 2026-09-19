@@ -1,0 +1,145 @@
+name: Cloud accessibility audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "URLs to audit, one per line"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a11y-audit-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RUN_DIR: ${{ runner.temp }}/a11y-audit
+      AUDIT_URLS: ${{ inputs.urls }}
+
+    steps:
+      - name: Check out audit kit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build viewport configs
+        shell: bash
+        run: |
+          mkdir -p "$RUN_DIR/reports"
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const runDir = process.env.RUN_DIR;
+          const urls = (process.env.AUDIT_URLS || "")
+            .split(/\r?\n/)
+            .map((url) => url.trim())
+            .filter(Boolean);
+
+          if (!urls.length) {
+            throw new Error("Provide at least one URL.");
+          }
+
+          for (const url of urls) {
+            const parsed = new URL(url);
+            if (!["http:", "https:"].includes(parsed.protocol)) {
+              throw new Error(`Unsupported URL protocol: ${parsed.protocol}`);
+            }
+          }
+
+          const makeConfig = (name, viewport) => ({
+            defaults: {
+              timeout: 30000,
+              wait: 2000,
+              viewport,
+              chromeLaunchConfig: {
+                args: ["--no-sandbox", "--disable-dev-shm-usage"],
+              },
+              reporters: [
+                "cli",
+                [
+                  "json",
+                  {
+                    fileName: path.join(
+                      runDir,
+                      "reports",
+                      `pa11y-${name}-results.json`,
+                    ),
+                  },
+                ],
+              ],
+            },
+            urls,
+          });
+
+          fs.writeFileSync(
+            path.join(runDir, ".pa11yci-desktop.json"),
+            JSON.stringify(
+              makeConfig("desktop", { width: 1440, height: 800 }),
+              null,
+              2,
+            ),
+          );
+
+          fs.writeFileSync(
+            path.join(runDir, ".pa11yci-mobile.json"),
+            JSON.stringify(
+              makeConfig("mobile", {
+                width: 390,
+                height: 812,
+                isMobile: true,
+                deviceScaleFactor: 2,
+              }),
+              null,
+              2,
+            ),
+          );
+          NODE
+
+      - name: Run desktop and mobile audits
+        shell: bash
+        run: |
+          run_audit() {
+            local viewport="$1"
+            local config="$RUN_DIR/.pa11yci-$viewport.json"
+            local report="$RUN_DIR/reports/pa11y-$viewport-results.json"
+
+            set +e
+            npx --yes pa11y-ci@latest --config "$config"
+            local status=$?
+            set -e
+
+            if [[ ! -s "$report" ]]; then
+              echo "::error::Pa11y failed before producing the $viewport report."
+              exit "$status"
+            fi
+          }
+
+          run_audit desktop
+          run_audit mobile
+
+      - name: Build Markdown digest
+        shell: bash
+        run: |
+          python3 scripts/pa11y_digest.py \
+            "desktop=$RUN_DIR/reports/pa11y-desktop-results.json" \
+            "mobile=$RUN_DIR/reports/pa11y-mobile-results.json" \
+            --out "$RUN_DIR/reports/a11y-audit.md"
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/a11y-audit/reports/
+          if-no-files-found: error
+          retention-days: 14
