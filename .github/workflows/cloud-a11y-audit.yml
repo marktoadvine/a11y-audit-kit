@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      RUN_DIR: ${{ runner.temp }}/a11y-audit
+      RUN_DIR: /tmp/a11y-audit
       AUDIT_URLS: ${{ inputs.urls }}
 
     steps:
@@ -140,6 +140,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: a11y-audit-${{ github.run_id }}
-          path: ${{ runner.temp }}/a11y-audit/reports/
+          path: /tmp/a11y-audit/reports/
           if-no-files-found: error
           retention-days: 14
