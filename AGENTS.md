@@ -16,6 +16,7 @@ The audit is deliberately **not** a crawl. It checks only the URLs it is given.
 | Path | What it is |
 | --- | --- |
 | `skills/a11y-audit/SKILL.md` | The audit procedure. Canonical copy. |
+| `scripts/run_audit.py` | One-command runner: preflight, both viewports, digest. |
 | `scripts/pa11y_digest.py` | JSON to markdown digest converter. |
 | `configs/desktop/.pa11yci.json` | Desktop viewport config, for manual runs only. |
 | `configs/mobile/.pa11yci.json` | Mobile viewport config, for manual runs only. |
@@ -27,12 +28,21 @@ Read **`skills/a11y-audit/SKILL.md`** and follow it. It is written for any
 agent with a shell and is the single source of truth for this workflow; this
 file only summarises it.
 
-In short: generate throwaway configs, run both viewports, merge the reports into
-one digest, then rank the findings into draft tickets.
+In short:
 
-The skill needs exactly one file from this repository, `scripts/pa11y_digest.py`,
-and writes its own Pa11y configs. If the working directory is not this
-repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
+```bash
+python3 scripts/run_audit.py --check URL...            # preflight, ~2 seconds
+python3 scripts/run_audit.py --out audit.md URL...     # both viewports + digest
+```
+
+then rank the findings into draft tickets. `run_audit.py` writes the throwaway
+configs, resolves Chromium and proxy settings, runs both viewports and builds
+the digest. Do not hand-roll those steps unless it cannot run; the skill has
+the manual fallback at the bottom.
+
+The skill needs two files from this repository, `scripts/run_audit.py` and
+`scripts/pa11y_digest.py`, and writes its own Pa11y configs. If the working
+directory is not this repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
 
 ## Things that will mislead you
 
@@ -55,7 +65,14 @@ repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
   cover them.
 - **Chromium often needs a launch config** in containers and CI. Add
   `chromeLaunchConfig` with `--no-sandbox` and `--disable-dev-shm-usage`
-  rather than giving up.
+  rather than giving up. `run_audit.py` always sets both.
+- **A TLS-intercepting proxy fails every page load** with
+  `ERR_CERT_AUTHORITY_INVALID`, because Chromium does not inherit the trust
+  your shell tools were given. Pass `--proxy-ca` with the proxy's certificate,
+  which pins that one key. Never disable certificate checking to get past it.
+- **Preflight before auditing.** `run_audit.py --check URL...` reports Node,
+  Chromium, the proxy and per-URL reachability in one pass. A blocked host or
+  a missing browser is much cheaper to find there than halfway through a run.
 
 ## Conventions
 
@@ -66,5 +83,6 @@ repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
   it cannot tell you.
 - Do not add URLs the user did not ask for, and confirm before auditing
   anything that is not obviously theirs to test.
-- Keep `scripts/pa11y_digest.py` dependency-free. It runs on a stock Python 3
-  install so that no setup step stands between a user and their report.
+- Keep `scripts/run_audit.py` and `scripts/pa11y_digest.py` dependency-free.
+  They run on a stock Python 3 install so that no setup step stands between a
+  user and their report.

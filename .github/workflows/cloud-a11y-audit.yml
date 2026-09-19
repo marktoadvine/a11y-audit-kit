@@ -32,108 +32,32 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build viewport configs
+      - name: Collect URLs
         shell: bash
         run: |
           mkdir -p "$RUN_DIR/reports"
-          node <<'NODE'
-          const fs = require("node:fs");
-          const path = require("node:path");
+          printf '%s\n' "$AUDIT_URLS" | sed 's/[[:space:]]*$//' | grep -v '^$' > "$RUN_DIR/urls.txt"
 
-          const runDir = process.env.RUN_DIR;
-          const urls = (process.env.AUDIT_URLS || "")
-            .split(/\r?\n/)
-            .map((url) => url.trim())
-            .filter(Boolean);
+          if [[ ! -s "$RUN_DIR/urls.txt" ]]; then
+            echo "::error::Provide at least one URL."
+            exit 1
+          fi
 
-          if (!urls.length) {
-            throw new Error("Provide at least one URL.");
-          }
+          while read -r url; do
+            if [[ "$url" != http://* && "$url" != https://* ]]; then
+              echo "::error::URLs must start with http:// or https:// — got '$url'"
+              exit 1
+            fi
+          done < "$RUN_DIR/urls.txt"
 
-          for (const url of urls) {
-            const parsed = new URL(url);
-            if (!["http:", "https:"].includes(parsed.protocol)) {
-              throw new Error(`Unsupported URL protocol: ${parsed.protocol}`);
-            }
-          }
-
-          const makeConfig = (name, viewport) => ({
-            defaults: {
-              timeout: 30000,
-              wait: 2000,
-              viewport,
-              chromeLaunchConfig: {
-                args: ["--no-sandbox", "--disable-dev-shm-usage"],
-              },
-              reporters: [
-                "cli",
-                [
-                  "json",
-                  {
-                    fileName: path.join(
-                      runDir,
-                      "reports",
-                      `pa11y-${name}-results.json`,
-                    ),
-                  },
-                ],
-              ],
-            },
-            urls,
-          });
-
-          fs.writeFileSync(
-            path.join(runDir, ".pa11yci-desktop.json"),
-            JSON.stringify(
-              makeConfig("desktop", { width: 1440, height: 800 }),
-              null,
-              2,
-            ),
-          );
-
-          fs.writeFileSync(
-            path.join(runDir, ".pa11yci-mobile.json"),
-            JSON.stringify(
-              makeConfig("mobile", {
-                width: 390,
-                height: 812,
-                isMobile: true,
-                deviceScaleFactor: 2,
-              }),
-              null,
-              2,
-            ),
-          );
-          NODE
+          echo "Auditing $(wc -l < "$RUN_DIR/urls.txt") URL(s)."
 
       - name: Run desktop and mobile audits
         shell: bash
         run: |
-          run_audit() {
-            local viewport="$1"
-            local config="$RUN_DIR/.pa11yci-$viewport.json"
-            local report="$RUN_DIR/reports/pa11y-$viewport-results.json"
-
-            set +e
-            npx --yes pa11y-ci@latest --config "$config"
-            local status=$?
-            set -e
-
-            if [[ ! -s "$report" ]]; then
-              echo "::error::Pa11y failed before producing the $viewport report."
-              exit "$status"
-            fi
-          }
-
-          run_audit desktop
-          run_audit mobile
-
-      - name: Build Markdown digest
-        shell: bash
-        run: |
-          python3 scripts/pa11y_digest.py \
-            "desktop=$RUN_DIR/reports/pa11y-desktop-results.json" \
-            "mobile=$RUN_DIR/reports/pa11y-mobile-results.json" \
+          python3 scripts/run_audit.py \
+            --urls-file "$RUN_DIR/urls.txt" \
+            --reports-dir "$RUN_DIR/reports" \
             --out "$RUN_DIR/reports/a11y-audit.md"
 
       - name: Publish digest to the run log and summary
