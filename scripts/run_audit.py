@@ -346,10 +346,13 @@ def summarise(report_paths):
             for issue in issues:
                 if not isinstance(issue, dict):
                     continue
-                message = str(issue.get("message", ""))
-                if "ERR_CERT" in message:
+                if "ERR_CERT" in str(issue.get("message", "")):
                     cert_error = True
-                if issue.get("code") in (None, "Error") or "Error:" in message:
+
+                # Same rule as pa11y_digest.py: a page that never loaded is
+                # stored as an Error object with no "code", so the two always
+                # agree on what counts as a failure rather than a finding.
+                if "code" not in issue:
                     if url not in failed_pages:
                         failed_pages.append(url)
                     continue
