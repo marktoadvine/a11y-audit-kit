@@ -6,8 +6,8 @@ Guidance for any coding agent working in this repository.
 
 A targeted accessibility audit harness. Pa11y CI checks a hand-picked list of
 URLs, and `scripts/pa11y_digest.py` converts the JSON results into a markdown
-digest that is readable by both a person and an agent, grouped so that one
-entry is one unit of remediation work rather than one per occurrence.
+digest that is readable by both a person and an agent, grouped by rule to support review. Groups are not guaranteed to map to one fix;
+occurrences across runs are retained and counted.
 
 The audit is deliberately **not** a crawl. It checks only the URLs it is given.
 
@@ -50,9 +50,9 @@ repository, `A11Y_AUDIT_KIT_DIR` points at a clone of it.
 - **A 404 or login wall often returns a simple, accessible error page**, which
   the audit scores as a clean pass. A page reporting zero findings while its
   siblings report many is the signal to check that the URL resolved.
-- **A page that failed to load was never audited.** The digest lists those
-  separately. Report them before the findings; the headline counts do not
-  cover them.
+- **A failed page check is not successful coverage.** Report failed URL/run
+  combinations before findings. A URL may succeed in another run; only successful
+  checks contribute to successful coverage and finding counts.
 - **Chromium often needs a launch config** in containers and CI. Add
   `chromeLaunchConfig` with `--no-sandbox` and `--disable-dev-shm-usage`
   rather than giving up.

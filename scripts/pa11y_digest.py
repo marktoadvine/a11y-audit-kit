@@ -3,8 +3,8 @@
 # Copyright (c) 2026 Mark Toadvine, @marktoadvine
 """Convert one or more Pa11y CI JSON reports into a single markdown digest.
 
-The digest groups findings by rule code so that each group maps to one unit of
-remediation work (one ticket), rather than one ticket per occurrence.
+The digest groups occurrences by rule for review. A rule group may require
+multiple fixes; occurrences from different runs are retained, not deduplicated.
 
 Usage:
     pa11y_digest.py --out REPORT.md desktop=desktop.json mobile=mobile.json
@@ -37,12 +37,11 @@ CODE_PATTERN = re.compile(
 )
 
 TYPE_RANK = {"error": 0, "warning": 1, "notice": 2}
-LEVEL_RANK = {"A": 0, "AA": 1, "AAA": 2}
 CONTEXT_LIMIT = 300
 
 
 def parse_code(code):
-    """Pull conformance level, success criterion and technique out of a code."""
+    """Pull test-standard suffix, success criterion and technique out of a code."""
     match = CODE_PATTERN.match(code)
     if not match:
         return {"level": None, "criterion": None, "technique": None}
@@ -54,7 +53,7 @@ def parse_code(code):
 
 
 def fingerprint(code, label, url, selector):
-    """Stable short id for one occurrence, so tickets can be made idempotent."""
+    """Repeatable reference while code, run label, URL and selector stay unchanged."""
     raw = "|".join([code, label, url, selector])
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
@@ -93,6 +92,7 @@ def load_reports(inputs):
     failures = []
     runs = []
     pages_seen = set()
+    successful_checks = 0
     pages_with_findings = set()
     total_findings = 0
 
@@ -105,7 +105,7 @@ def load_reports(inputs):
         except json.JSONDecodeError as error:
             sys.exit(f"Error: {path} is not valid JSON ({error}).")
 
-        results = report.get("results")
+        results = report.get("results") if isinstance(report, dict) else None
         if not isinstance(results, dict):
             sys.exit(
                 f"Error: {path} has no top-level 'results' object. "
@@ -121,25 +121,26 @@ def load_reports(inputs):
         })
 
         for url, issues in results.items():
-            pages_seen.add(url)
-            if not isinstance(issues, list):
+            if not isinstance(issues, list) or any(
+                not isinstance(issue, dict) for issue in issues
+            ):
+                sys.exit(f"Error: {path}: invalid results for {url}; expected a list of objects.")
+
+            failed = any("code" not in issue for issue in issues)
+            if failed:
+                failures.append({
+                    "label": label,
+                    "url": url,
+                    "message": "; ".join(
+                        clean(issue.get("message", "Unknown error"))
+                        for issue in issues if "code" not in issue
+                    ),
+                })
                 continue
+            pages_seen.add(url)
+            successful_checks += 1
 
             for issue in issues:
-                if not isinstance(issue, dict):
-                    continue
-
-                # Pa11y CI stores a page that never loaded as an Error object,
-                # which the JSON reporter flattens to {"message": ...}. Those
-                # are not accessibility findings and must not become tickets.
-                if "code" not in issue:
-                    failures.append({
-                        "label": label,
-                        "url": url,
-                        "message": clean(issue.get("message", "Unknown error")),
-                    })
-                    continue
-
                 code = issue["code"]
                 selector = issue.get("selector", "")
                 findings_by_code[code].append({
@@ -160,6 +161,7 @@ def load_reports(inputs):
         "failures": failures,
         "runs": runs,
         "pages_seen": pages_seen,
+        "successful_checks": successful_checks,
         "pages_with_findings": pages_with_findings,
         "total_findings": total_findings,
     }
@@ -186,7 +188,6 @@ def summarise_group(code, occurrences):
 def sort_key(group):
     return (
         TYPE_RANK.get(group["type"], 9),
-        LEVEL_RANK.get(group["level"], 3),
         -group["count"],
         group["code"],
     )
@@ -211,14 +212,15 @@ def render(data):
         "# Pa11y Accessibility Audit Digest",
         "",
         f"- **Generated:** {generated}",
-        f"- **Pages tested:** {len(data['pages_seen'])}",
+        f"- **Unique URLs successfully tested:** {len(data['pages_seen'])}",
+        f"- **Successful page checks (across runs):** {data['successful_checks']}",
         f"- **Pages with findings:** {len(data['pages_with_findings'])}",
-        f"- **Total findings:** {data['total_findings']}"
+        f"- **Finding occurrences (across runs):** {data['total_findings']}"
         f" (errors {type_counts['error']},"
         f" warnings {type_counts['warning']},"
         f" notices {type_counts['notice']})",
         f"- **Distinct rules:** {len(groups)}",
-        f"- **Pages that failed to load:** {len(failures)}",
+        f"- **Failed page checks (across runs):** {len(failures)}",
         "",
         "### Sources",
         "",
@@ -240,11 +242,11 @@ def render(data):
 
     if failures:
         lines.extend([
-            "## Pages that failed to load",
+            "## Failed page checks",
             "",
-            "These pages were never audited, so the counts above do not cover"
-            " them. Fix access and rerun before treating this audit as"
-            " complete.",
+            "These URL/run combinations were not successfully audited and are excluded"
+            " from successful-check and finding counts. A URL may have succeeded in"
+            " another run. Resolve these errors and rerun before treating coverage as complete.",
             "",
             "| Run | URL | Error |",
             "| --- | --- | --- |",
@@ -259,9 +261,13 @@ def render(data):
     lines.extend([
         "## Summary by rule",
         "",
-        "One row is one unit of remediation work.",
+        "Each row groups a rule for review, not a confirmed ticket or unique fix.",
+        "Occurrences from every run are retained and counted; they are not deduplicated.",
+        "The standard prefix is not a severity rating or the criterion's conformance level.",
+        "IDs repeat only while rule, run label, URL and selector stay unchanged;",
+        "they do not detect new, resolved or reopened issues automatically.",
         "",
-        "| Rule | Level | SC | Type | Findings | Pages | Runs |",
+        "| Rule | Standard prefix | SC | Type | Occurrences | Pages | Runs |",
         "| --- | --- | --- | --- | --- | --- | --- |",
     ])
     if not groups:
@@ -292,7 +298,7 @@ def render(data):
             f"- **Type:** {group['type']}",
         ])
         if group["level"]:
-            lines.append(f"- **Conformance level:** WCAG 2 {group['level']}")
+            lines.append(f"- **Standard prefix:** WCAG 2 {group['level']}")
         if group["criterion"]:
             lines.append(f"- **Success criterion:** {group['criterion']}")
         if group["technique"]:
@@ -379,7 +385,7 @@ def main():
         f"Created digest: {output_path} "
         f"({data['total_findings']} finding(s), "
         f"{len(data['findings_by_code'])} distinct rule(s), "
-        f"{len(data['failures'])} page(s) failed to load)"
+        f"{len(data['failures'])} failed page check(s))"
     )
 
 

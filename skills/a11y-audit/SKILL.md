@@ -96,7 +96,7 @@ keys, so a lowercase spelling means the run is at 1x and nothing warns you.
 
 Run both viewports unless the user asks for one. Mobile finds different issues
 — reflow, touch target spacing, menus that only exist at small widths — and the
-digest merges them, so the second run is cheap.
+digest combines them while retaining and counting each run’s occurrences.
 
 Keep the 2 second `wait`. It is what lets client-rendered pages settle before
 the scan; dropping it produces false "missing content" findings.
@@ -133,8 +133,10 @@ python3 "$DIGEST" \
   --out "a11y-audit-$(date +%F).md"
 ```
 
-The script groups by rule code, parses the WCAG level and success criterion out
-of each code, and merges both viewports.
+The script groups by rule code and combines both viewports without deduplicating
+occurrences. It parses a standard prefix and success criterion from HTML_CodeSniffer
+codes; the prefix is not the criterion’s conformance level or severity. Axe slugs
+leave these fields blank.
 
 Write the digest somewhere the user will keep it, not in the temp directory, and
 tell them the path. If the working directory is not somewhere they would want a
@@ -142,8 +144,9 @@ file, ask where to put it.
 
 ### 6. Check coverage before reporting
 
-Read the **Pages that failed to load** section first. Those pages were never
-audited, so the headline counts do not cover them. Report them before the
+Read the **Failed page checks** section first. These URL/run combinations were
+not successfully audited and are excluded from successful-check and finding counts.
+The same URL may have succeeded in another run. Report them before the
 findings — an audit that silently skipped a third of the site is misleading,
 and "0 findings" on an unreachable page reads like a pass.
 
@@ -154,15 +157,16 @@ the signal to check the URL resolved.
 
 ### 7. Triage into draft tickets
 
-Work from the **Summary by rule** table. One row is one candidate ticket.
+Work from the **Summary by rule** table. Inspect components and root causes before
+deciding how many tickets a rule group needs.
 
 Order by what blocks users, not by count:
 
 - **Errors before warnings before notices.** Notices are advisory and many are
   not defects.
-- **Level A before AA before AAA** at equal type.
-- A rule hitting many pages is usually a shared template or component. Say so
-  in the ticket and name the fix site once, rather than filing per page.
+- Assess user impact and task blockers; do not use the standard prefix as severity.
+- Check whether repeated findings share a template or component before grouping
+  them into a ticket. The same rule can require unrelated fixes.
 
 For each ticket worth opening, draft:
 
@@ -171,11 +175,11 @@ For each ticket worth opening, draft:
   string.
 - The affected URLs and selectors, from the occurrence list.
 - The WCAG success criterion, so a reviewer can verify the fix.
-- The occurrence fingerprints, so a rerun can tell a reopened issue from a new
-  one.
+- Occurrence IDs as comparison references. They repeat only while rule, run
+  label, URL and selector stay unchanged; they do not identify regressions automatically.
 
-Collapse a rule that appears at both viewports into one ticket, noting both.
-Split one only where the fix genuinely differs by viewport.
+Combine occurrences into one ticket only when they share a confirmed fix, noting
+both viewports where relevant. Split unrelated components or root causes.
 
 Flag anything automation cannot settle. Pa11y checks what is machine checkable;
 it cannot judge whether alt text is *accurate*, whether a heading order is

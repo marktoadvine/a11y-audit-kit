@@ -142,8 +142,8 @@ Important:
 ## Make the markdown digest
 
 Pa11y CI writes JSON. The Python script turns it into a markdown digest that
-both a person and a chat agent can read, grouped so that one entry is one unit
-of remediation work rather than one per occurrence.
+both a person and a chat agent can read, grouped by rule to support review and remediation planning. A group can require
+multiple fixes across unrelated components.
 
 Run it on a single report:
 
@@ -165,18 +165,30 @@ filename.
 
 The digest contains:
 
-- A summary of pages tested, findings by type, and distinct rules.
-- Any pages that **failed to load**, listed separately. Those pages were never
-  audited, so the headline counts do not cover them.
-- A summary table of one row per rule, with the WCAG conformance level and
-  success criterion parsed out of the rule code so findings can be ranked by
-  severity rather than only by count.
-- Findings by rule, and again by page, with a short stable id per occurrence so
-  a rerun can tell a reopened issue from a new one.
+- Unique URLs successfully tested and successful page checks across runs.
+- Failed URL/run combinations, excluded from successful checks and findings.
+  A URL can succeed in one viewport and fail in another.
+- A summary by rule, including the standard prefix and success criterion parsed
+  from HTML_CodeSniffer codes. Axe slugs leave these fields blank. The prefix
+  identifies the test standard, not the criterion's level or user-impact severity.
+- Occurrences organized by rule and by page, retaining every run's evidence.
 
-A note on reading the output: the same issue found at both viewports is one
-unit of work, not two. The digest merges those, and the `Runs` column shows
-which viewports each rule appeared in.
+Desktop/mobile occurrences are grouped, **not deduplicated**. Counts include
+both runs; review the affected components before deciding how many fixes or
+tickets are needed. Rules sort by reported type, then occurrence count and code;
+this display order is not a remediation priority assessment.
+
+An occurrence ID repeats while its rule, run label, URL and selector stay the
+same. Keep explicit run labels consistent for comparisons. Changes to those
+fields change the ID; identical fields share an ID, and selectors can change
+with the DOM. IDs are references, not automatic regression tracking.
+
+See the [worked example](examples/digest/README.md) for raw inputs and a rendered
+digest. Run the dependency-free tests from the repository root:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
 
 ## Run it from a chat agent
 

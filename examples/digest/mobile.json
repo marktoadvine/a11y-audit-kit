@@ -1,0 +1,28 @@
+{
+  "total": 3,
+  "passes": 0,
+  "errors": 3,
+  "results": {
+    "https://example.test/": [
+      {
+        "code": "WCAG2AA.Principle1.Guideline1_1.1_1_1.H37",
+        "type": "error",
+        "typeCode": 1,
+        "message": "Synthetic example: image needs alternative text.",
+        "selector": "#header-logo",
+        "context": "<img src=\"example.png\">",
+        "runner": "htmlcs"
+      }
+    ],
+    "https://example.test/about": [
+      {
+        "message": "Synthetic navigation timeout"
+      }
+    ],
+    "https://example.test/offline": [
+      {
+        "message": "Synthetic connection failure"
+      }
+    ]
+  }
+}
