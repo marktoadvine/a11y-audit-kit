@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -94,6 +95,34 @@ class DigestTests(unittest.TestCase):
             {'type': 'error', 'level': 'AA', 'count': 3, 'code': 'b'},
         ]
         self.assertEqual(sorted(groups, key=digest.sort_key)[0]['code'], 'b')
+
+    def test_committed_example_matches_generator(self):
+        inputs = digest.parse_inputs([
+            'desktop=examples/digest/desktop.json',
+            'mobile=examples/digest/mobile.json',
+        ])
+        # The CLI contract and documented regeneration command run at repo root.
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'audit.md'
+            result = subprocess.run([
+                sys.executable, str(SCRIPT), '--out', str(output),
+                *[f'{label}={path}' for label, path in inputs],
+            ], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            without_timestamp = lambda text: re.sub(
+                r'^- \*\*Generated:\*\*.*$', '', text, flags=re.MULTILINE)
+            self.assertEqual(
+                without_timestamp(output.read_text()),
+                without_timestamp((ROOT / 'examples/digest/audit.md').read_text()),
+            )
+
+    def test_handoff_references_exist_in_fixture_evidence(self):
+        data = self.example()
+        known = {item['id'] for items in data['findings_by_code'].values()
+                 for item in items}
+        handoff = (ROOT / 'examples/digest/handoff.md').read_text()
+        referenced = set(re.findall(r'`([0-9a-f]{12})`', handoff))
+        self.assertEqual(referenced, known)
 
     def test_cli_single_legacy_and_multi_input(self):
         with tempfile.TemporaryDirectory() as directory:

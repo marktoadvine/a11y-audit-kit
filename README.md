@@ -1,12 +1,31 @@
 # a11y-audit-kit
 
-A plug-and-play setup for humans or agents to run Pa11y, and convert the report.json into a digestible
-markdown, using a python script.
+A repeatable, agent-assisted accessibility audit workflow built around
+[Pa11y CI](https://github.com/pa11y/pa11y-ci). Give a coding agent a targeted list
+of URLs and a defined procedure guides it through desktop/mobile scans,
+coverage review, a readable digest, and draft remediation tickets.
 
-This repository runs automated accessibility checks on your selected pages using
-[Pa11y CI](https://github.com/pa11y/pa11y-ci).
-Pa11y offers a sitemap.xml crawl, but this process keeps things manual and
-targeted for efficient testing within internal teams and reporting.
+Pa11y performs the automated checks. A dependency-free Python script handles
+report grouping and counts. The agent assists with interpretation and drafting;
+a person verifies findings and decides what to fix or file.
+
+This is a workflow and reporting kit, not a new accessibility scanner or an
+autonomous compliance assessment. You can also run the scans and digest by hand.
+
+## See the complete handoff
+
+Start with the [worked example](examples/digest/README.md): raw desktop/mobile
+reports, a [combined digest](examples/digest/audit.md), and an
+[illustrative review and ticket handoff](examples/digest/handoff.md).
+These are synthetic examples, not evidence of a live scan or cross-agent validation.
+
+| Stage | Responsibility |
+| --- | --- |
+| Configure and run | Agent follows the canonical procedure for the supplied URLs |
+| Count and group | Python preserves occurrences and their run labels |
+| Review coverage | Agent surfaces failed checks and verifies intended pages where possible |
+| Propose work | Agent drafts evidence-linked tickets, with assumptions marked |
+| Verify and approve | Human confirms findings and authorizes any filing |
 
 ## Quick start
 
@@ -26,9 +45,11 @@ Open your coding agent in that folder and ask, in plain words:
 
 > Audit these URLs for accessibility: example.com, example.com/about-us
 
-The agent picks up the skill on its own, runs the audit at both desktop and
-mobile, writes the markdown digest, and hands back findings ranked into draft
-tickets. Nothing to configure.
+Agents that support the repository's discovery files can find the procedure
+automatically. Otherwise, ask the agent to read `skills/a11y-audit/SKILL.md`
+first. It generates the configs, runs both viewports, builds the digest, and
+drafts findings for review. Runtime installation and permissions may still
+need your attention; compatibility has not been verified across every agent.
 
 You are pointing the tool at **live URLs**, so the site being audited has
 nothing to do with the folder you are in. You never need to be inside your
@@ -47,7 +68,9 @@ python3 ../../scripts/pa11y_digest.py reports/pa11y-desktop-results.json ../../r
 The rest of this README covers that route in detail.
 
 You need [Node.js](https://nodejs.org/) either way, and Python 3 for the digest.
-Both are checked below.
+Check both below. If Chromium cannot run locally, see the
+[GitHub Actions route](CLOUD_AUDIT.md). That route generates reports, not tickets;
+an agent or person still needs to review and triage them.
 
 ## What does it do?
 
@@ -72,9 +95,13 @@ Open Terminal and run:
 
 ```bash
 node --version
+python3 --version
 ```
 
-If you see a version number, you are ready.
+Use an even-numbered Node.js release supported by the Pa11y CI version you run
+(the included cloud workflow uses Node 22), plus Python 3. The scan also needs
+Chromium and its system libraries, network access to the supplied URLs, and
+permission to run the tools. A version number alone does not verify those.
 
 ## Run the audit
 
@@ -82,7 +109,8 @@ If you see a version number, you are ready.
 
 2. Open Terminal.
 
-3. Go to the repository folder.
+3. From the repository root, run `cd configs/desktop` and edit that folder's
+   `.pa11yci.json` with your URLs. For a mobile scan, use `configs/mobile` instead.
 
    Tip: On a MacOS, type `cd ` with a space after it. Drag the repository folder from Finder into Terminal, then press Return.
 
@@ -108,7 +136,7 @@ To save results as a JSON file, run:
 npx pa11y-ci@latest --json > pa11y-results.json
 ```
 
-This creates `pa11y-results.json` in the repository folder.
+Run this from the chosen viewport folder. It creates `pa11y-results.json` there.
 
 Running the command again replaces the existing report. To keep a dated copy:
 
@@ -145,7 +173,8 @@ Pa11y CI writes JSON. The Python script turns it into a markdown digest that
 both a person and a chat agent can read, grouped by rule to support review and remediation planning. A group can require
 multiple fixes across unrelated components.
 
-Run it on a single report:
+Run the following digest commands from the repository root, after the scans
+have written their reports. For a single report:
 
 ```bash
 python3 scripts/pa11y_digest.py --out reports/audit.md configs/desktop/reports/pa11y-desktop-results.json
@@ -232,7 +261,7 @@ folder:
 
 | Want | Do this |
 | --- | --- |
-| It available in every project, no clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `A11Y_AUDIT_KIT_DIR` to a clone of this repository |
+| It available in every project from one shared clone | Copy `skills/a11y-audit/SKILL.md` into your agent's personal skills folder, and set `A11Y_AUDIT_KIT_DIR` to a clone of this repository |
 | It to live alongside your own app, for example in CI | Copy `skills/a11y-audit/SKILL.md` and `scripts/pa11y_digest.py` into your project, add a pointer to your `AGENTS.md`, and keep `LICENSE` alongside them |
 | A one-off audit, any agent | Paste the contents of `skills/a11y-audit/SKILL.md` into the chat and give it your URLs |
 
@@ -240,9 +269,9 @@ folder:
 directory is somewhere else. If it is not set, the skill looks in the working
 directory, then alongside itself, then asks.
 
-Nothing a run produces is written into this repository or your working
-directory. Pa11y's configs and raw JSON go to a temp directory, and only the
-digest is written where you ask for it.
+In the agent procedure, configs and raw JSON go to a temp directory; the digest
+is written to your chosen output location. Manual runs use the configured report
+paths. Preserve raw reports if you need an evidence archive beyond the temp run.
 
 ## Review findings
 
@@ -318,5 +347,6 @@ includes Pa11y source: the configs are data it reads, and the digest script
 parses the JSON it prints. Running a separately installed program and reading
 its output does not make this a derivative work of it.
 
-Rule codes like `WCAG2AA.Principle1.Guideline1_4.1_4_3.G18.Fail` come from
-HTML_CodeSniffer by way of Pa11y, at run time. None of that text is stored here.
+Live rule codes come from the selected runner by way of Pa11y. The worked
+example includes representative codes and explicitly synthetic messages for
+demonstration and testing.

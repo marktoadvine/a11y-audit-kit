@@ -120,8 +120,8 @@ jobs:
             set -e
 
             if [[ ! -s "$report" ]]; then
-              echo "::error::Pa11y failed before producing the $viewport report."
-              exit "$status"
+              echo "::error::Missing $viewport report (Pa11y exit status: $status)."
+              exit 1
             fi
           }
 

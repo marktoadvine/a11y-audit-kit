@@ -14,4 +14,12 @@ The artifact is retained for 14 days and contains:
 - `pa11y-mobile-results.json`
 - `a11y-audit.md`
 
-The workflow does not contain default targets, commit submitted URLs, or publish reports. URLs are provided only at run time. Pa11y findings may make its process exit nonzero; the workflow treats the run as successful when the expected JSON report was produced.
+The workflow does not contain default targets or commit submitted URLs. URLs
+are provided at run time, but may appear in Actions logs and artifacts; their
+visibility follows repository access. Do not submit sensitive URLs or credentials.
+
+Pa11y findings may make its process exit nonzero. The workflow requires report
+files and a successful digest conversion; this confirms report generation, not
+complete coverage or accessibility. Read failed checks in the digest even when
+the workflow is green. It does not generate or file tickets: give the reports to
+your agent for coverage review and draft triage, or review them yourself.

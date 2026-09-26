@@ -7,6 +7,10 @@ The `.test` URLs do not represent an audited site.
 Compare the raw [desktop JSON](desktop.json) and [mobile JSON](mobile.json)
 with the [combined Markdown digest](audit.md).
 
+Then read the [illustrative agent handoff](handoff.md) for coverage review,
+evidence-linked ticket drafts, and explicitly marked assumptions. It is a
+hand-authored demonstration, not a recorded end-to-end agent run.
+
 | Scenario in the raw inputs | What the digest shows |
 | --- | --- |
 | Header image finding on two pages and both viewports | One rule group, with each occurrence and run retained |
